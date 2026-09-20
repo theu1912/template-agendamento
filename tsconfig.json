@@ -1,0 +1,30 @@
+{
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "compilerOptions": {
+    // "5.0" (não "6.0") é o valor aceito pela versão do TypeScript instalada
+    // (5.9.3) — suprime o aviso de depreciação do "baseUrl" abaixo, que
+    // continua sendo genuinamente necessário: server/_core/imageGeneration.ts
+    // importa de "server/storage" (caminho não-relativo), que só resolve
+    // graças ao baseUrl. Sem baseUrl esse import quebra (TS2307). Ver
+    // barbershop-template.md para o histórico da investigação.
+    "ignoreDeprecations": "5.0",
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
+    "noEmit": true,
+    "module": "ESNext",
+    "strict": true,
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["./client/src/*"],
+      "@shared/*": ["./shared/*"]
+    }
+  }
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!--
+      PLACEHOLDER: metadados de SEO/redes sociais. Este HTML é estático (não lê
+      client/src/config/site.ts) — ao adaptar para um cliente novo, edite
+      title/description/keywords e o JSON-LD abaixo manualmente, mantendo
+      coerência com os valores em site.ts (nome, cidade, serviços, preços).
+    -->
+    <title>Sua Barbearia | Barbearia em Curitiba | Agende em Segundos</title>
+    <meta name="description" content="Agende seu horário na Sua Barbearia, em Curitiba, com nossa Assistente Virtual 24h." />
+    <meta name="keywords" content="barbearia curitiba, corte de cabelo masculino curitiba" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HairSalon",
+      "name": "Sua Barbearia",
+      "description": "Barbearia em Curitiba com serviços de cabelo e barba.",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Curitiba",
+        "addressRegion": "PR",
+        "addressCountry": "BR"
+      },
+      "priceRange": "$$"
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Lato:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

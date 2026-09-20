@@ -1,0 +1,20 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+
+# Log persistente do detector de "agendamento fantasma" (server/routers.ts) —
+# já coberto por "*.log" acima, mas listado explícito para não passar
+# despercebido: pode conter respostas reais da IA em texto.
+logs/
+
+# Base de dados caseira antiga (arquivo JSON), substituída por Postgres via
+# Drizzle. Pode conter dados de teste (nome/telefone/CPF) de sessões de dev.
+banco_barbearia.json
+
+# Dados de dev/debug de ferramentas locais (não devem ir pro repo público)
+.manus/
+.manus-logs/
+.claude/
