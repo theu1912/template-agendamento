@@ -5,6 +5,12 @@ Foi feito para negócios que trabalham com hora marcada, e **este repositório e
 exemplo para uma barbearia**: serviços, preços, profissionais e horários de funcionamento de uma
 barbearia fictícia.
 
+## Capturas de tela
+
+| Agenda | Financeiro |
+|---|---|
+| ![Agenda](docs/agenda.png) | ![Financeiro](docs/financeiro.png) |
+
 ## O que ele faz
 
 - **Chat com IA que agenda de verdade.** O cliente escreve como escreveria no WhatsApp
