@@ -2,12 +2,12 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { XCircle, Phone, Mail, FileText, CheckCircle, Clock, DollarSign, Users, UserPlus, LayoutDashboard, Calendar, Settings, Lock, TrendingUp, BarChart3, Save, Receipt, MinusCircle, MessageCircle, AlertCircle } from "lucide-react";
+import { XCircle, Phone, Mail, FileText, CheckCircle, Clock, Users, UserPlus, Settings, Lock, BarChart3, Save, Receipt, MessageCircle, AlertCircle, LogOut, ChevronDown, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { siteConfig } from "@/config/site";
+import { formatBRL } from "@/lib/utils";
 
 const TODOS_SERVICOS: { nome: string; preco: number }[] = [...siteConfig.servicos];
 
@@ -16,12 +16,24 @@ const dataHojeIso = new Date(new Date().getTime() - new Date().getTimezoneOffset
 
 const formatarDataBR = (dataIso) => {
   if (!dataIso) return "-";
-  const partes = dataIso.split('-'); 
+  const partes = dataIso.split('-');
   if (partes.length === 3) {
-    return `${partes[2]}/${partes[1]}/${partes[0]}`; 
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
   }
   return dataIso;
 };
+
+// O fluxo do formulário do site grava "(com Profissional X)" dentro do
+// próprio texto do serviço no banco (server/routers.ts, appointments.create)
+// — não mexido aqui, só removido da exibição, já que o profissional já
+// aparece separado logo abaixo.
+const formatarServicoExibido = (services) => {
+  if (!services) return "";
+  return services.replace(/\s*\(com [^)]*\)\s*$/i, "");
+};
+
+const STATUS_LABEL = { pendente: "Pendente", confirmado: "Confirmado", concluido: "Concluído", cancelado: "Cancelado" };
+const STATUS_DOT = { pendente: "bg-yellow-500", confirmado: "bg-blue-500", concluido: "bg-green-500", cancelado: "bg-red-500" };
 
 export function EditarAgendamento({ agendamentoId, servicosAtuais, onSalvar }) {
   const stringOriginal = servicosAtuais.join(", ");
@@ -89,7 +101,7 @@ export default function AdminDashboard() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showGastosModal, setShowGastosModal] = useState(false);
 
-  const { data, isLoading, refetch } = trpc.appointments.list.useQuery();
+  const { data, isLoading, isFetching, refetch } = trpc.appointments.list.useQuery();
   const appointments = Array.isArray(data) ? data : [];
 
   const [abaAtiva, setAbaAtiva] = useState("agenda"); 
@@ -287,30 +299,32 @@ export default function AdminDashboard() {
     );
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = { pendente: "bg-yellow-100 text-yellow-800", confirmado: "bg-blue-100 text-blue-800", concluido: "bg-green-100 text-green-800", cancelado: "bg-red-100 text-red-800" };
-    return colors[status] || "bg-gray-100 text-gray-800";
-  };
-
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      <div className="bg-white border-b border-[#D4AF37]/30 sticky top-0 z-40 shadow-sm">
-        <div className="container py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-[#800020] tracking-tight">{siteConfig.nomeBarbeariaCurto}</h1>
-              <p className="text-gray-500 text-xs font-semibold uppercase tracking-widest">Painel Administrativo</p>
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="container py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-md bg-[#800020] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+              {siteConfig.nomeBarbeariaCurto.charAt(0)}
             </div>
-            <Button onClick={() => setLocation("/")} variant="outline" className="border-[#800020] text-[#800020] hover:bg-red-50 font-bold">Sair do Sistema</Button>
+            <div className="text-sm">
+              <span className="font-semibold text-gray-900">{siteConfig.nomeBarbeariaCurto}</span>
+              <span className="text-gray-400"> · Painel</span>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setAbaAtiva("agenda")} className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${abaAtiva === "agenda" ? "bg-[#800020] text-white shadow-md" : "text-gray-500 hover:bg-gray-100"}`}>
-              <Calendar className="w-4 h-4" /> Agenda da Semana
+          <button onClick={() => setLocation("/")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <LogOut className="w-4 h-4" /> Sair
+          </button>
+        </div>
+        <div className="container overflow-x-auto">
+          <nav className="flex gap-6 w-max min-w-full">
+            <button onClick={() => setAbaAtiva("agenda")} className={`shrink-0 whitespace-nowrap -mb-px pb-2.5 border-b-2 text-sm transition-colors ${abaAtiva === "agenda" ? "text-gray-900 border-[#800020] font-medium" : "text-gray-500 border-transparent hover:text-gray-700"}`}>
+              Agenda
             </button>
-            <button onClick={() => setAbaAtiva("dono")} className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-all ${abaAtiva === "dono" ? "bg-[#D4AF37] text-[#800020] shadow-md" : "text-gray-500 hover:bg-gray-100"}`}>
-              <LayoutDashboard className="w-4 h-4" /> Visão Estratégica (Dono)
+            <button onClick={() => setAbaAtiva("dono")} className={`shrink-0 whitespace-nowrap -mb-px pb-2.5 border-b-2 text-sm transition-colors ${abaAtiva === "dono" ? "text-gray-900 border-[#800020] font-medium" : "text-gray-500 border-transparent hover:text-gray-700"}`}>
+              Financeiro
             </button>
-          </div>
+          </nav>
         </div>
       </div>
 
@@ -327,23 +341,25 @@ export default function AdminDashboard() {
               </Card>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                  <Card className="p-5 border-l-4 border-l-blue-500 bg-white shadow-sm flex flex-row items-center justify-between h-28">
-                    <div><p className="text-[10px] font-black text-gray-400 uppercase mb-1">Bruto (30 Dias)</p><h3 className="text-2xl font-bold text-gray-800">R$ {totalFaturamento30Dias.toFixed(2)}</h3></div>
-                    <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center"><DollarSign className="text-blue-600 w-6 h-6" /></div>
-                  </Card>
-                  <Card className="p-5 border-l-4 border-l-red-500 bg-white shadow-sm flex flex-row items-center justify-between h-28">
-                    <div><p className="text-[10px] font-black text-gray-400 uppercase mb-1">Gastos Totais</p><h3 className="text-2xl font-bold text-red-600">- R$ {totalGastos.toFixed(2)}</h3></div>
-                    <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center"><MinusCircle className="text-red-600 w-6 h-6" /></div>
-                  </Card>
-                  <Card className={`p-5 border-l-4 ${lucroLiquido >= 0 ? 'border-l-green-500' : 'border-l-orange-500'} bg-white shadow-lg flex flex-row items-center justify-between h-28 transform scale-105 z-10 border-2 ${lucroLiquido >= 0 ? 'border-green-100' : 'border-red-100'}`}>
-                    <div><p className="text-[10px] font-black text-gray-400 uppercase mb-1">Lucro Líquido</p><h3 className={`text-3xl font-black ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>R$ {lucroLiquido.toFixed(2)}</h3></div>
-                    <div className={`w-12 h-12 ${lucroLiquido >= 0 ? 'bg-green-100' : 'bg-red-100'} rounded-full flex items-center justify-center`}><TrendingUp className={`${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'} w-7 h-7`} /></div>
-                  </Card>
-                  <Card className="p-5 border-l-4 border-l-[#D4AF37] bg-white shadow-sm flex flex-row items-center justify-between h-28">
-                    <div><p className="text-[10px] font-black text-gray-400 uppercase mb-1">Ticket Médio</p><h3 className="text-2xl font-bold text-gray-800">R$ {ticketMedio.toFixed(2)}</h3></div>
-                    <div className="w-12 h-12 bg-yellow-50 rounded-full flex items-center justify-center"><BarChart3 className="text-[#D4AF37] w-6 h-6" /></div>
-                  </Card>
+                <div className="bg-white border border-gray-200 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
+                    <div className="p-5">
+                      <p className="text-sm text-gray-500">Faturamento bruto · 30 dias</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{formatBRL(totalFaturamento30Dias)}</p>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-sm text-gray-500">Despesas · 30 dias</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-red-600">{formatBRL(-totalGastos)}</p>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-sm text-gray-500">Lucro líquido · 30 dias</p>
+                      <p className={`mt-1 text-2xl font-semibold tabular-nums ${lucroLiquido >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatBRL(lucroLiquido)}</p>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-sm text-gray-500">Ticket médio · 30 dias</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{formatBRL(ticketMedio)}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -392,7 +408,7 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <div className="text-right flex flex-col">
-                            <span className={`font-black text-lg ${dia.faturamento > 0 ? 'text-green-600' : 'text-gray-300'}`}>R$ {dia.faturamento.toFixed(2)}</span>
+                            <span className={`font-semibold tabular-nums text-lg ${dia.faturamento > 0 ? 'text-green-600' : 'text-gray-300'}`}>{formatBRL(dia.faturamento)}</span>
                             <span className="text-[10px] font-bold text-gray-400 uppercase">{dia.contagem} atendimentos</span>
                           </div>
                         </div>
@@ -425,25 +441,26 @@ export default function AdminDashboard() {
 
         {abaAtiva === "agenda" && (
           <div className="animate-in slide-in-from-bottom-4 duration-500">
-            <Card className="bg-white shadow-2xl rounded-2xl overflow-hidden border-none ring-1 ring-black/5">
-              <div className="p-6 bg-[#800020] flex flex-col md:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-4 text-white">
-                  <div className="p-3 bg-white/10 rounded-xl"><Calendar className="w-8 h-8" /></div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Agenda de Atendimentos</h2>
-                    <p className="text-white/60 text-sm font-medium">Controle os cortes do dia com eficiência</p>
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Agenda <span className="text-sm font-normal text-gray-400">· {agendamentosFiltrados.length} agendamento{agendamentosFiltrados.length === 1 ? "" : "s"}</span>
+                </h2>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                  <div className="inline-flex items-center bg-gray-100 rounded-md p-1 h-9 w-full sm:w-auto">
+                    <button onClick={() => setFiltroStatus("pendentes")} className={`flex-1 sm:flex-none px-3 h-full rounded text-sm transition-all ${filtroStatus === "pendentes" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>Fila ativa</button>
+                    <button onClick={() => setFiltroStatus("historico")} className={`flex-1 sm:flex-none px-3 h-full rounded text-sm transition-all ${filtroStatus === "historico" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>Histórico</button>
                   </div>
-                </div>
-                <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-                  <select className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:text-[#800020] transition-all outline-none w-full md:w-48" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
-                    <option value="pendentes" className="text-gray-800">Fila Ativa</option>
-                    <option value="historico" className="text-gray-800">Histórico Passado</option>
-                  </select>
-                  <select className="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:text-[#800020] transition-all outline-none w-full md:w-56" value={filtroBarbeiro} onChange={e => setFiltroBarbeiro(e.target.value)}>
-                    <option value="Todos" className="text-gray-800">Todos os Profissionais</option>
-                    {listaBarbeiros.map(b => <option key={b.id} value={b.nome} className="text-gray-800">{b.nome}</option>)}
-                  </select>
-                  <Button onClick={() => refetch()} className="bg-white text-[#800020] hover:bg-gray-100 font-black px-6 py-3 shadow-lg w-full md:w-auto">ATUALIZAR</Button>
+                  <div className="relative w-full sm:w-52">
+                    <select className="appearance-none w-full h-9 border border-gray-200 rounded-md pl-3 pr-8 text-sm text-gray-700 bg-white focus:outline-none focus:border-[#800020]/50 focus:ring-1 focus:ring-[#800020]/20" value={filtroBarbeiro} onChange={e => setFiltroBarbeiro(e.target.value)}>
+                      <option value="Todos">Todos os profissionais</option>
+                      {listaBarbeiros.map(b => <option key={b.id} value={b.nome}>{b.nome}</option>)}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  <button onClick={() => refetch()} className="h-9 flex items-center justify-center gap-2 border border-gray-200 rounded-md px-4 text-sm text-gray-700 hover:bg-gray-50 w-full sm:w-auto">
+                    <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} /> Atualizar
+                  </button>
                 </div>
               </div>
 
@@ -451,41 +468,39 @@ export default function AdminDashboard() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="p-6 text-xs font-black text-gray-400 uppercase tracking-widest">Informações do Cliente</th>
-                      <th className="p-6 text-xs font-black text-gray-400 uppercase tracking-widest">Serviços e Faturamento</th>
-                      <th className="p-6 text-xs font-black text-gray-400 uppercase tracking-widest text-center">📅 Horário do Corte</th>
-                      <th className="p-6 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
-                      <th className="p-6 text-xs font-black text-gray-400 uppercase tracking-widest">Ações</th>
+                      <th className="p-6 text-xs font-medium text-gray-500">Cliente</th>
+                      <th className="p-6 text-xs font-medium text-gray-500">Serviço</th>
+                      <th className="p-6 text-xs font-medium text-gray-500 text-center">Horário</th>
+                      <th className="p-6 text-xs font-medium text-gray-500">Status</th>
+                      <th className="p-6 text-xs font-medium text-gray-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {agendamentosFiltrados.map((app) => (
-                      <tr key={app.id} className="hover:bg-blue-50/20 transition-colors group">
+                      <tr key={app.id} className="hover:bg-gray-50/60 transition-colors">
                         <td className="p-6">
-                          <p className="font-bold text-gray-800 text-lg group-hover:text-[#800020] transition-colors">{app.name}</p>
-                          {app.phone && <div className="flex items-center gap-2 text-gray-400 mt-1"><Phone className="w-3 h-3" /><span className="text-xs font-bold">{app.phone}</span></div>}
-                          {app.email && <div className="flex items-center gap-2 text-gray-400 mt-1"><Mail className="w-3 h-3" /><span className="text-xs font-bold">{app.email}</span></div>}
+                          <p className="font-bold text-gray-900">{app.name}</p>
+                          {app.phone && <div className="flex items-center gap-2 text-gray-400 mt-1"><Phone className="w-3 h-3" /><span className="text-xs">{app.phone}</span></div>}
+                          {app.email && <div className="flex items-center gap-2 text-gray-400 mt-1"><Mail className="w-3 h-3" /><span className="text-xs">{app.email}</span></div>}
                         </td>
                         <td className="p-6">
-                          <p className="text-sm font-bold text-gray-700">{app.services}</p>
-                          <p className="text-[10px] font-black text-gray-500 mt-1 uppercase tracking-wider">
-                            PROFISSIONAL: <span className="text-[#800020]">{app.professional}</span>
-                          </p>
-                          <p className="text-xs font-black text-[#D4AF37] mt-1">VALOR: R$ {Number(app.totalPrice || 0).toFixed(2)}</p>
+                          <p className="text-sm text-gray-800">{formatarServicoExibido(app.services)}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{app.professional} · {formatBRL(Number(app.totalPrice || 0))}</p>
+                        </td>
+                        <td className="p-6 text-center">
+                          <p className="text-sm font-bold text-gray-900 tabular-nums">{app.appointmentTime || '--:--'}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{formatarDataBR(app.appointmentDate)}</p>
                         </td>
                         <td className="p-6">
-                          <div className="bg-gray-50 group-hover:bg-white rounded-2xl p-4 border border-gray-100 group-hover:border-[#D4AF37]/30 transition-all flex flex-col items-center shadow-inner group-hover:shadow-md">
-                            <span className="text-xl font-black text-[#800020] mb-1">{app.appointmentTime || '--:--'}</span>
-                            <span className="text-xs font-bold text-gray-500">{formatarDataBR(app.appointmentDate)}</span>
-                          </div>
-                        </td>
-                        <td className="p-6">
-                          <Badge className={`${getStatusColor(app.status)} px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm border-none`}>{app.status.toUpperCase()}</Badge>
+                          <span className="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[app.status] || "bg-gray-400"}`} />
+                            {STATUS_LABEL[app.status] || app.status}
+                          </span>
                         </td>
                         <td className="p-6">
                           <div className="flex items-center gap-3">
-                            <Button onClick={() => abrirGerenciar(app)} className="bg-[#D4AF37] hover:bg-[#C49A27] text-[#800020] font-black rounded-xl px-5 shadow-md">GERENCIAR</Button>
-                            <button onClick={() => window.confirm(`Apagar ficha de ${app.name}?`) && deleteMutation.mutate({ id: app.id })} className="p-2 text-red-200 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"><XCircle className="w-7 h-7" /></button>
+                            <button onClick={() => abrirGerenciar(app)} className="text-sm text-gray-700 border border-gray-200 rounded-md px-3 py-1.5 hover:bg-gray-50">Abrir</button>
+                            <button onClick={() => window.confirm(`Apagar ficha de ${app.name}?`) && deleteMutation.mutate({ id: app.id })} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"><XCircle className="w-5 h-5" /></button>
                           </div>
                         </td>
                       </tr>
@@ -507,7 +522,7 @@ export default function AdminDashboard() {
           <div className="space-y-6 mt-4">
             <div className="bg-red-50 p-6 rounded-2xl border-2 border-red-100">
               <p className="text-xs text-red-400 font-black uppercase mb-1">Total de Despesas Fixas</p>
-              <h2 className="text-3xl font-black text-red-600">R$ {totalGastos.toFixed(2)}</h2>
+              <h2 className="text-3xl font-black text-red-600">{formatBRL(totalGastos)}</h2>
             </div>
             
             <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
@@ -518,7 +533,7 @@ export default function AdminDashboard() {
                     {g.expiraEm && <span className="text-[10px] font-bold text-red-400 uppercase">Expira em: {formatarDataBR(g.expiraEm)}</span>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-black text-gray-800">R$ {g.valor.toFixed(2)}</span>
+                    <span className="font-black text-gray-800">{formatBRL(g.valor)}</span>
                     <button onClick={() => removerGasto(g.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Remover Gasto">
                       <XCircle className="w-5 h-5" />
                     </button>
