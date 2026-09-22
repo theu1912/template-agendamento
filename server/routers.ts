@@ -4,7 +4,8 @@ dns.setDefaultResultOrder("ipv4first");
 import fs from "fs";
 import path from "path";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import crypto from "crypto";
+import { publicProcedure, router, protectedProcedure, tokenAdminValido } from "./_core/trpc";
 import { createAppointment, getAppointments, updateAppointmentStatus, deleteAppointment, updateAppointmentServices, updateAppointmentDateTime } from "./db";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -32,6 +33,31 @@ function registrarAgendamentoFantasma(respostaIA: string) {
   }
 }
 
+// Rate limit simples em memória do chat com IA, por IP — sem isso, num site
+// publicado, qualquer um pode disparar milhares de mensagens e gastar os
+// créditos da Anthropic. Janela fixa (não é o mais preciso, mas é o
+// suficiente pra um site de barbearia): reseta a contagem a cada 10min.
+const LIMITE_MENSAGENS_CHAT = 20;
+const JANELA_RATE_LIMIT_MS = 10 * 60 * 1000;
+const contagemChatPorIp = new Map<string, { contagem: number; inicioJanela: number }>();
+
+function chatLiberadoParaIp(ip: string): boolean {
+  const agora = Date.now();
+  const registro = contagemChatPorIp.get(ip);
+
+  if (!registro || agora - registro.inicioJanela > JANELA_RATE_LIMIT_MS) {
+    contagemChatPorIp.set(ip, { contagem: 1, inicioJanela: agora });
+    return true;
+  }
+
+  if (registro.contagem >= LIMITE_MENSAGENS_CHAT) {
+    return false;
+  }
+
+  registro.contagem += 1;
+  return true;
+}
+
 export const appRouter = router({
   
   // ROTA DA IA (COM CONTEXTO DINÂMICO, MEMÓRIA E TOOL CALLING)
@@ -45,7 +71,14 @@ export const appRouter = router({
       telefone: z.string().optional(),
       email: z.string().optional()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const ipCliente = ctx.req?.ip || ctx.req?.socket?.remoteAddress || "desconhecido";
+      if (!chatLiberadoParaIp(ipCliente)) {
+        return {
+          reply: "Recebi muitas mensagens em pouco tempo por aqui. Dá uma pausa de alguns minutos e volta a falar comigo, combinado?",
+        };
+      }
+
       try {
         const agora = new Date();
         const dataHoje = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -291,8 +324,8 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
     me: publicProcedure.query(({ ctx }) => {
       const authHeader = ctx?.req?.headers?.authorization?.trim() || '';
       const token = authHeader.replace('Bearer ', '').trim();
-      if (token === 'acesso_libertado') return { role: 'admin' };
-      return null; 
+      if (tokenAdminValido(token)) return { role: 'admin' };
+      return null;
     }),
 
     logout: protectedProcedure.mutation(() => {
@@ -304,11 +337,12 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
       .mutation(({ input }) => {
         const senhaMestra = process.env.ADMIN_PASSWORD?.trim();
         const senhaDigitada = input.password.trim();
+        const adminToken = process.env.ADMIN_TOKEN;
 
-        if (!senhaMestra) {
+        if (!senhaMestra || !adminToken) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "FALHA: A variável ADMIN_PASSWORD não foi carregada pelo .env"
+            message: "FALHA: ADMIN_PASSWORD ou ADMIN_TOKEN não foram carregados pelo .env"
           });
         }
 
@@ -318,7 +352,39 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
             message: "Senha incorreta. Tente novamente."
           });
         }
-        
+
+        return { success: true, token: adminToken };
+      }),
+
+    // Senha da "Área do Gerente" dentro do painel — validada aqui (nunca no
+    // client, senão qualquer VITE_* vaza no bundle público). Só acessível
+    // por quem já tem o ADMIN_TOKEN (protectedProcedure), já que essa tela
+    // só aparece dentro do /admin.
+    verificarSenhaGerente: protectedProcedure
+      .input(z.object({ senha: z.string() }))
+      .mutation(({ input }) => {
+        const senhaGerente = process.env.SENHA_GERENTE?.trim();
+
+        if (!senhaGerente) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "FALHA: A variável SENHA_GERENTE não foi carregada pelo .env"
+          });
+        }
+
+        const bufRecebido = Buffer.from(input.senha.trim());
+        const bufEsperado = Buffer.from(senhaGerente);
+        const senhaCorreta =
+          bufRecebido.length === bufEsperado.length &&
+          crypto.timingSafeEqual(bufRecebido, bufEsperado);
+
+        if (!senhaCorreta) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Senha incorreta."
+          });
+        }
+
         return { success: true };
       }),
   }),
@@ -411,7 +477,7 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
         return novoAgendamento;
       }),
     
-    reschedule: publicProcedure
+    reschedule: protectedProcedure
       .input(z.object({ id: z.number(), appointmentDate: z.string(), appointmentTime: z.string() }))
       .mutation(async ({ input }) => {
         const todosAgendamentos = await getAppointments();
@@ -437,10 +503,10 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
         return await updateAppointmentDateTime(input.id, input.appointmentDate, input.appointmentTime);
       }),
 
-    list: publicProcedure.query(async () => await getAppointments()),
-    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deleteAppointment(input.id)),
-    updateStatus: publicProcedure.input(z.object({ id: z.number(), status: z.enum(['pendente', 'confirmado', 'concluido', 'cancelado']) })).mutation(async ({ input }) => await updateAppointmentStatus(input.id, input.status)),
-    atualizarServicos: publicProcedure.input(z.object({ id: z.number(), novosServicos: z.string(), novoPreco: z.string() })).mutation(async ({ input }) => await updateAppointmentServices(input.id, input.novosServicos, input.novoPreco)),
+    list: protectedProcedure.query(async () => await getAppointments()),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deleteAppointment(input.id)),
+    updateStatus: protectedProcedure.input(z.object({ id: z.number(), status: z.enum(['pendente', 'confirmado', 'concluido', 'cancelado']) })).mutation(async ({ input }) => await updateAppointmentStatus(input.id, input.status)),
+    atualizarServicos: protectedProcedure.input(z.object({ id: z.number(), novosServicos: z.string(), novoPreco: z.string() })).mutation(async ({ input }) => await updateAppointmentServices(input.id, input.novosServicos, input.novoPreco)),
   }),
 });
 

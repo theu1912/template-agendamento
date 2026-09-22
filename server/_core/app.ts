@@ -24,10 +24,19 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// trust proxy: necessário pra req.ip refletir o IP real do visitante atrás
+// de um proxy (Vercel, etc.) em vez do IP interno do proxy — usado pelo
+// rate limit do chat em routers.ts.
+app.set("trust proxy", true);
+
 app.use(
   "/api/trpc",
   createExpressMiddleware({
     router: appRouter,
-    createContext: () => ({}), // Ignora cookies de sessão para agendamento público
+    // Passa req/res reais pro contexto (necessário para o protectedProcedure
+    // ler o header Authorization) — antes retornava {} e descartava a
+    // request inteira, o que fazia toda rota protegida rejeitar sempre,
+    // mesmo com o token correto.
+    createContext: ({ req, res }) => ({ req, res, user: null }),
   })
 );

@@ -14,8 +14,7 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       headers: async () => {
-        const token = localStorage.getItem('barbarov_token');
-        console.log("🛡️ [Front-end] Crachá na rede:", token);
+        const token = localStorage.getItem('barbershop_admin_token');
         if (token) {
           return { authorization: `Bearer ${token}` };
         }

@@ -57,8 +57,8 @@ então o front sempre usa a mesma URL relativa.
 | `DATABASE_URL`      | Connection string do PostgreSQL                                  |
 | `ANTHROPIC_API_KEY` | Chave da API usada pelo chatbot (lida só no servidor)            |
 | `ADMIN_PASSWORD`    | Senha de acesso ao painel `/admin`                               |
-| `ADMIN_TOKEN`       | Token das rotas administrativas                                  |
-| `VITE_SENHA_MESTRE` | Senha da área do gerente (faturamento e despesas) no painel      |
+| `ADMIN_TOKEN`       | Token das rotas administrativas (gere um valor aleatório novo)   |
+| `SENHA_GERENTE`     | Senha da área do gerente (faturamento e despesas), validada só no servidor |
 | `VITE_WEBHOOK_URL`  | Webhook do Make.com para as notificações (opcional)              |
 
 O arquivo `.env` nunca vai para o repositório. Use o `.env.example` como modelo.

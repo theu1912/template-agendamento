@@ -7,8 +7,8 @@ export function AdminLogin({ onLoginSuccess }: { onLoginSuccess: () => void }) {
   const [error, setError] = useState('');
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
-      localStorage.setItem('barbarov_token', 'acesso_libertado');
+    onSuccess: (data) => {
+      localStorage.setItem('barbershop_admin_token', data.token);
       onLoginSuccess();
     },
     onError: (err) => {

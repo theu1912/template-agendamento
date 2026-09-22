@@ -98,9 +98,17 @@ export default function AdminDashboard() {
   
   const [donoAutenticado, setDonoAutenticado] = useState(false);
   const [senhaInput, setSenhaInput] = useState("");
-  // Sem fallback hardcoded: se VITE_SENHA_MESTRE não estiver definida no .env,
-  // o painel do gerente fica bloqueado (nunca expor senha padrão no bundle do client).
-  const SENHA_MESTRE = import.meta.env.VITE_SENHA_MESTRE;
+  // Senha validada no servidor (auth.verificarSenhaGerente), nunca no client —
+  // uma variável VITE_* iria pro bundle e apareceria no DevTools de qualquer
+  // visitante, mesmo sem acesso ao /admin.
+  const verificarSenhaGerenteMutation = trpc.auth.verificarSenhaGerente.useMutation({
+    onSuccess: () => setDonoAutenticado(true),
+    onError: () => alert("Senha Incorreta"),
+  });
+  const tentarDesbloquearGerente = () => {
+    if (!senhaInput || verificarSenhaGerenteMutation.isPending) return;
+    verificarSenhaGerenteMutation.mutate({ senha: senhaInput });
+  };
 
   // --- GERENCIAMENTO DE BARBEIROS ---
   const [listaBarbeiros, setListaBarbeiros] = useState(() => {
@@ -314,8 +322,8 @@ export default function AdminDashboard() {
                 <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6"><Lock className="w-10 h-10 text-[#800020]" /></div>
                 <h3 className="text-2xl font-black text-gray-800 mb-2">Área do Gerente</h3>
                 <p className="text-gray-500 mb-8 text-sm leading-relaxed">Confirme sua identidade para acessar os dados de faturamento e despesas.</p>
-                <input type="password" placeholder="Senha" className="w-full border-2 border-gray-100 focus:border-[#800020] outline-none rounded-xl p-4 mb-4 text-center font-bold text-xl tracking-[0.3em]" value={senhaInput} onChange={e => setSenhaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (senhaInput === SENHA_MESTRE ? setDonoAutenticado(true) : alert("Senha Incorreta"))} />
-                <Button onClick={() => senhaInput === SENHA_MESTRE ? setDonoAutenticado(true) : alert("Senha Incorreta")} className="w-full bg-[#800020] hover:bg-[#600018] text-white font-bold py-4 rounded-xl text-lg shadow-lg">Desbloquear Painel</Button>
+                <input type="password" placeholder="Senha" className="w-full border-2 border-gray-100 focus:border-[#800020] outline-none rounded-xl p-4 mb-4 text-center font-bold text-xl tracking-[0.3em]" value={senhaInput} onChange={e => setSenhaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && tentarDesbloquearGerente()} />
+                <Button onClick={tentarDesbloquearGerente} disabled={verificarSenhaGerenteMutation.isPending} className="w-full bg-[#800020] hover:bg-[#600018] text-white font-bold py-4 rounded-xl text-lg shadow-lg">{verificarSenhaGerenteMutation.isPending ? "Verificando..." : "Desbloquear Painel"}</Button>
               </Card>
             ) : (
               <>
