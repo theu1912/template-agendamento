@@ -18,3 +18,9 @@ banco_barbearia.json
 .manus/
 .manus-logs/
 .claude/
+
+# Anotações e instruções de uso pessoal (ficam só no PC)
+ideas.md
+CLAUDE.md
+GUIA_EXECUCAO.md
+client/src.zip
