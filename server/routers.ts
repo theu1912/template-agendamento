@@ -3,7 +3,6 @@ import dns from "dns";
 dns.setDefaultResultOrder("ipv4first");
 import fs from "fs";
 import path from "path";
-import { systemRouter } from "./_core/systemRouter";
 import crypto from "crypto";
 import { publicProcedure, router, protectedProcedure, tokenAdminValido } from "./_core/trpc";
 import { createAppointment, getAppointments, updateAppointmentStatus, deleteAppointment, updateAppointmentServices, updateAppointmentDateTime } from "./db";

@@ -9,9 +9,11 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
 ]);
 
 /**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
+ * Tabela de usuários, herdada do template original (scaffold de auth por
+ * OAuth). Nenhum código deste app a usa hoje — auth real é via ADMIN_TOKEN
+ * (ver server/_core/trpc.ts). Mantida sem alteração estrutural: existe de
+ * verdade no Postgres em produção e não deve ser removida sem confirmação
+ * explícita (decisão registrada no log do projeto).
  */
 export const users = pgTable("users", {
   /**
@@ -19,7 +21,7 @@ export const users = pgTable("users", {
    * Use this for relations between tables.
    */
   id: serial("id").primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  /** Identificador externo único por usuário (herdado do fluxo de OAuth original). */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
