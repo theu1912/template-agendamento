@@ -345,29 +345,29 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-gray-100">
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Faturamento bruto · 30 dias</p>
-                      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{formatBRL(totalFaturamento30Dias)}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap text-gray-900">{formatBRL(totalFaturamento30Dias)}</p>
                     </div>
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Despesas · 30 dias</p>
-                      <p className="mt-1 text-2xl font-semibold tabular-nums text-red-600">{formatBRL(-totalGastos)}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap text-red-600">{formatBRL(-totalGastos)}</p>
                     </div>
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Lucro líquido · 30 dias</p>
-                      <p className={`mt-1 text-2xl font-semibold tabular-nums ${lucroLiquido >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatBRL(lucroLiquido)}</p>
+                      <p className={`mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap ${lucroLiquido >= 0 ? 'text-gray-900' : 'text-red-600'}`}>{formatBRL(lucroLiquido)}</p>
                     </div>
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Ticket médio · 30 dias</p>
-                      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{formatBRL(ticketMedio)}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap text-gray-900">{formatBRL(ticketMedio)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <Card className="lg:col-span-1 bg-white shadow-xl border-2 border-green-100 rounded-2xl overflow-hidden flex flex-col">
-                    <div className="p-6 bg-green-50/50 border-b border-green-100 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center"><MessageCircle className="text-green-600 w-5 h-5" /></div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card className="lg:col-span-1 bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col">
+                    <div className="p-5 border-b border-gray-100 flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-gray-400" />
                       <div>
-                        <h3 className="font-bold text-gray-800">Máquina de Vendas (CRM)</h3>
+                        <h3 className="text-sm font-semibold text-gray-900">Máquina de Vendas (CRM)</h3>
                         <p className="text-xs text-gray-500">Resgate de Clientes Inativos</p>
                       </div>
                     </div>
@@ -380,36 +380,36 @@ export default function AdminDashboard() {
                         </div>
                       ) : (
                         clientesSumidos.map((cliente, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-green-300 transition-all">
+                          <div key={idx} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg hover:border-gray-300 transition-all">
                             <div>
                               <p className="font-bold text-sm text-gray-800">{cliente.nome.split(' ')[0]}</p>
-                              <p className="text-[10px] font-bold text-red-500 uppercase">Ausente: {cliente.diasSumido} dias</p>
+                              <p className="text-xs text-red-500">Ausente: {cliente.diasSumido} dias</p>
                             </div>
-                            <Button onClick={() => resgatarCliente(cliente)} size="sm" className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold px-3 rounded-lg shadow-md flex items-center gap-2">
-                              <MessageCircle className="w-4 h-4" /> Resgatar
-                            </Button>
+                            <button onClick={() => resgatarCliente(cliente)} className="text-sm text-green-700 border border-gray-200 rounded-md px-3 py-1.5 hover:bg-gray-50 flex items-center gap-1.5">
+                              <MessageCircle className="w-3.5 h-3.5" /> Resgatar
+                            </button>
                           </div>
                         ))
                       )}
                     </div>
                   </Card>
 
-                  <Card className="lg:col-span-2 bg-white shadow-xl border border-gray-100 rounded-2xl overflow-hidden">
-                    <div className="p-6 bg-gray-50 border-b flex items-center justify-between">
-                      <div className="flex items-center gap-3"><BarChart3 className="text-[#800020]" /><h3 className="font-bold text-gray-800">Projeção Financeira Diária</h3></div>
+                  <Card className="lg:col-span-2 bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-[#800020]" /><h3 className="text-sm font-semibold text-gray-900">Projeção Financeira Diária</h3></div>
                     </div>
                     <div className="max-h-[400px] overflow-y-auto">
                       {dadosFinanceiros30Dias.map((dia) => (
-                        <div key={dia.dataObj} className="p-4 flex items-center justify-between border-b border-gray-50 hover:bg-blue-50/30 transition-all">
+                        <div key={dia.dataObj} className="p-4 flex items-center justify-between border-b border-gray-50 hover:bg-gray-50/60 transition-all">
                           <span className="font-bold text-gray-600 w-20 capitalize">{dia.dataFormatada}</span>
                           <div className="flex-1 px-8 hidden md:block">
-                            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-[#D4AF37] rounded-full" style={{ width: `${(dia.faturamento / maiorFaturamentoDia) * 100}%` }}></div>
+                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#D4AF37]/70 rounded-full" style={{ width: `${(dia.faturamento / maiorFaturamentoDia) * 100}%` }}></div>
                             </div>
                           </div>
                           <div className="text-right flex flex-col">
                             <span className={`font-semibold tabular-nums text-lg ${dia.faturamento > 0 ? 'text-green-600' : 'text-gray-300'}`}>{formatBRL(dia.faturamento)}</span>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">{dia.contagem} atendimentos</span>
+                            <span className="text-xs text-gray-400">{dia.contagem} atendimentos</span>
                           </div>
                         </div>
                       ))}
@@ -418,20 +418,20 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
-                  <Card className="p-6 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center">
-                    <Users className="w-8 h-8 text-[#800020] mb-3" />
-                    <h4 className="font-bold mb-4">Gestão de Equipe</h4>
-                    <Button onClick={() => setShowFuncionarioModal(true)} className="w-full bg-[#800020] text-white font-bold rounded-xl">Novo Profissional</Button>
+                  <Card className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col items-center text-center">
+                    <Users className="w-5 h-5 text-[#800020] mb-2" />
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Gestão de Equipe</h4>
+                    <button onClick={() => setShowFuncionarioModal(true)} className="w-full text-sm text-gray-700 border border-gray-200 rounded-md py-2 hover:bg-gray-50">Novo Profissional</button>
                   </Card>
-                  <Card className="p-6 bg-white border-2 border-red-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center">
-                    <Receipt className="w-8 h-8 text-red-600 mb-3" />
-                    <h4 className="font-bold mb-4">Saídas de Caixa</h4>
-                    <Button onClick={() => setShowGastosModal(true)} variant="outline" className="w-full border-red-600 text-red-600 hover:bg-red-50 font-bold rounded-xl">Gerenciar Despesas</Button>
+                  <Card className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col items-center text-center">
+                    <Receipt className="w-5 h-5 text-red-600 mb-2" />
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Saídas de Caixa</h4>
+                    <button onClick={() => setShowGastosModal(true)} className="w-full text-sm text-gray-700 border border-gray-200 rounded-md py-2 hover:bg-gray-50">Gerenciar Despesas</button>
                   </Card>
-                  <Card className="p-6 bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center">
-                    <Settings className="w-8 h-8 text-gray-500 mb-3" />
-                    <h4 className="font-bold mb-4">Ajustes da Loja</h4>
-                    <Button onClick={() => setShowConfigModal(true)} variant="outline" className="w-full border-gray-300 text-gray-600 font-bold rounded-xl">Configurações globais</Button>
+                  <Card className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col items-center text-center">
+                    <Settings className="w-5 h-5 text-gray-500 mb-2" />
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Ajustes da Loja</h4>
+                    <button onClick={() => setShowConfigModal(true)} className="w-full text-sm text-gray-700 border border-gray-200 rounded-md py-2 hover:bg-gray-50">Configurações globais</button>
                   </Card>
                 </div>
               </>
