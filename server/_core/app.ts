@@ -8,10 +8,33 @@ import { seedDadosOperacionaisSeVazio } from "../db";
 // (server/_core/index.ts) quanto a função serverless da Vercel (api/index.ts,
 // que só importa este `app`, nunca chama startServer()). Idempotente (só
 // insere se a tabela estiver vazia) e não bloqueia a subida do servidor —
-// falha (ex: DATABASE_URL ausente) só loga, não derruba o processo.
-seedDadosOperacionaisSeVazio().catch((erro) => {
-  console.error("⚠️ Falha ao semear dados operacionais (professionals/services/expenses):", erro.message);
-});
+// falha nunca derruba o processo.
+//
+// Tenta mais de uma vez de propósito: o Postgres serverless (Neon) hiberna
+// quando fica ocioso, e a conexão aqui é preguiçosa — a primeira consulta sai
+// junto com o boot e pode falhar enquanto o banco ainda está acordando. Numa
+// instalação nova isso significaria tabelas vazias sem ninguém perceber: o
+// painel sem serviços e o chatbot sem tabela de preços para informar. Loga a
+// causa real (erro.cause), porque o Drizzle embrulha o erro do Postgres numa
+// mensagem genérica de "Failed query" que não diz o que de fato aconteceu.
+async function semearComRetentativa(tentativas = 3, esperaMs = 3000) {
+  for (let tentativa = 1; tentativa <= tentativas; tentativa++) {
+    try {
+      await seedDadosOperacionaisSeVazio();
+      return;
+    } catch (erro: any) {
+      const causa = erro?.cause?.message || erro?.message || String(erro);
+      if (tentativa === tentativas) {
+        console.error(`⚠️ Falha ao semear dados operacionais após ${tentativas} tentativas:`, causa);
+        return;
+      }
+      console.warn(`↻ Semente falhou (tentativa ${tentativa}/${tentativas}), nova tentativa em ${esperaMs / 1000}s:`, causa);
+      await new Promise((resolver) => setTimeout(resolver, esperaMs));
+    }
+  }
+}
+
+semearComRetentativa();
 
 // App Express puro (sem .listen()) — reaproveitado tanto pelo servidor
 // tradicional (server/_core/index.ts, usado em npm run server / dev local)
