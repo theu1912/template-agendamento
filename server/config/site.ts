@@ -14,26 +14,20 @@ export const siteConfig = {
   whatsappNumero: "5500000000000",
   telefoneExibicao: "(00) 00000-0000",
 
-  // Nomes dos profissionais ativos, usados pelo bot para oferecer opções
-  profissionais: ["Profissional 1", "Profissional 2", "Profissional 3"],
-
   // Horário de funcionamento exibido no prompt do bot. Placeholder proposital
   // (não fictício) — replicar manualmente em client/src/config/site.ts
   // (campo `horarioFuncionamentoDetalhado`) quando o cliente definir o horário real.
   horarioFuncionamento: "A definir com o cliente",
 
-  // Tabela de preços usada pelo bot para calcular orçamentos.
-  // Ajuste livremente para os serviços reais do cliente.
-  servicos: [
-    { nome: "Cabelo", preco: 60 },
-    { nome: "Barba", preco: 60 },
-    { nome: "Cabelo & Barba", preco: 110 },
-    { nome: "Corte à Máquina", preco: 35 },
-    { nome: "Pézinho", preco: 25 },
-    { nome: "Sobrancelha Pinça", preco: 40 },
-    { nome: "Sobrancelha Navalha", preco: 25 },
-    { nome: "Hidratação", preco: 25 },
-  ],
+  // Profissionais e tabela de preços NÃO ficam mais aqui — são dados
+  // operacionais gerenciados pelo painel e vivem no Postgres (tabelas
+  // `professionals`/`services`, ver drizzle/schema.ts). O prompt do bot
+  // (server/routers.ts) lê direto do banco a cada mensagem, então preço
+  // editado no painel chega imediatamente à IA. client/src/config/site.ts
+  // (profissionais/servicos) serve só de semente inicial pro banco numa
+  // instalação nova (ver server/db.ts, seedDadosOperacionaisSeVazio) — este
+  // arquivo (server) nunca teve essa função de semente, então não precisa
+  // manter cópia própria.
 
   // Serviços especiais/diferenciais (opcional). Deixe a lista vazia ([])
   // se o cliente não tiver ofertas especiais além do corte/barba padrão —
@@ -46,12 +40,6 @@ export const siteConfig = {
   // Política de desconto: true = o bot recusa pedidos de desconto educadamente
   negarDescontos: true,
 } as const;
-
-export function formatarListaServicos(): string {
-  return siteConfig.servicos
-    .map((s) => `- ${s.nome}: R$ ${s.preco.toFixed(2).replace(".", ",")}`)
-    .join("\n");
-}
 
 export function formatarServicosEspeciais(): string {
   if (siteConfig.servicosEspeciais.length === 0) return "";

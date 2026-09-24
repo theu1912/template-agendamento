@@ -2,6 +2,16 @@
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
+import { seedDadosOperacionaisSeVazio } from "../db";
+
+// Roda no carregamento do módulo — cobre tanto o servidor tradicional
+// (server/_core/index.ts) quanto a função serverless da Vercel (api/index.ts,
+// que só importa este `app`, nunca chama startServer()). Idempotente (só
+// insere se a tabela estiver vazia) e não bloqueia a subida do servidor —
+// falha (ex: DATABASE_URL ausente) só loga, não derruba o processo.
+seedDadosOperacionaisSeVazio().catch((erro) => {
+  console.error("⚠️ Falha ao semear dados operacionais (professionals/services/expenses):", erro.message);
+});
 
 // App Express puro (sem .listen()) — reaproveitado tanto pelo servidor
 // tradicional (server/_core/index.ts, usado em npm run server / dev local)

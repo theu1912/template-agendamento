@@ -5,11 +5,25 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { publicProcedure, router, protectedProcedure, tokenAdminValido } from "./_core/trpc";
-import { createAppointment, getAppointments, updateAppointmentStatus, deleteAppointment, updateAppointmentServices, updateAppointmentDateTime } from "./db";
+import {
+  createAppointment, getAppointments, updateAppointmentStatus, deleteAppointment, updateAppointmentServices, updateAppointmentDateTime,
+  getProfessionals, createProfessional, updateProfessional, deactivateProfessional,
+  getServices, createService, updateService, deactivateService,
+  getExpenses, createExpense, deleteExpense,
+} from "./db";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import Anthropic from '@anthropic-ai/sdk';
-import { siteConfig, formatarListaServicos, formatarServicosEspeciais } from "./config/site";
+import { siteConfig, formatarServicosEspeciais } from "./config/site";
+
+// Formata a lista de preços pro prompt do bot a partir do banco (tabela
+// `services`) em vez do site.ts — preço editado no painel chega na IA sem
+// precisar reiniciar o servidor nem editar arquivo nenhum.
+function formatarListaServicosDb(servicosDb: { nome: string; preco: string }[]): string {
+  return servicosDb
+    .map((s) => `- ${s.nome}: R$ ${Number(s.preco).toFixed(2).replace(".", ",")}`)
+    .join("\n");
+}
 
 // Inicializa o cliente do Anthropic
 const anthropic = new Anthropic();
@@ -91,6 +105,8 @@ export const appRouter = router({
         const horaAtual = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
         const todosAgendamentos = await getAppointments();
+        const [servicosDb, profissionaisDb] = await Promise.all([getServices(), getProfessionals()]);
+        const nomesProfissionaisAtivos = profissionaisDb.map((p) => p.nome);
         const agendamentosAtivos = todosAgendamentos.filter((app: any) => app.status !== 'cancelado' && app.appointmentDate >= dataIso);
 
         const ocupadosMap: Record<string, string[]> = {};
@@ -129,7 +145,7 @@ export const appRouter = router({
 
 PROTOCOLO OBRIGATÓRIO DE AGENDAMENTO (SIGA RIGOROSAMENTE A ORDEM):
 1. NUNCA realize um agendamento ou acione a ferramenta sem antes perguntar QUAL BARBEIRO o cliente deseja.
-2. Os profissionais ativos da ${siteConfig.nomeBarbearia} são: ${siteConfig.profissionais.join(", ")}. Se o cliente não souber, apresente essas opções.
+2. Os profissionais ativos da ${siteConfig.nomeBarbearia} são: ${nomesProfissionaisAtivos.join(", ")}. Se o cliente não souber, apresente essas opções.
 3. REGRA DE CONFLITO: Se o horário solicitado estiver na LISTA DE HORÁRIOS OCUPADOS para o barbeiro escolhido, você NUNCA deve dizer apenas que a barbearia está lotada. Você é OBRIGADA a oferecer duas alternativas:
    - Pergunte se ele aceita ver o próximo horário livre do mesmo barbeiro.
    - Pergunte se ele aceita manter o horário, mas fazer com outro barbeiro livre.
@@ -189,7 +205,7 @@ REGRAS ABSOLUTAS GERAIS:
    cancele ou remarque manualmente.
 
 BASE DE CONHECIMENTO (Preços e Serviços):
-${formatarListaServicos()}
+${formatarListaServicosDb(servicosDb)}
 
 INSTRUÇÃO DA FERRAMENTA:
 Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no campo 'totalPrice' (apenas números). Formate a data EXATAMENTE no padrão internacional YYYY-MM-DD. Não é preciso informar o telefone do cliente na ferramenta — o sistema já usa o telefone da sessão automaticamente.`,
@@ -206,7 +222,7 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
                   date: { type: "string", description: "A data no formato YYYY-MM-DD (ex: 2026-05-18)" },
                   time: { type: "string", description: "A hora do agendamento (ex: 15:00)" },
                   service: { type: "string", description: "O serviço escolhido" },
-                  professional: { type: "string", description: `O barbeiro escolhido (${siteConfig.profissionais.join(", ")})` },
+                  professional: { type: "string", description: `O barbeiro escolhido (${nomesProfissionaisAtivos.join(", ")})` },
                   totalPrice: { type: "string", description: "O preço total calculado. Ex: 60" }
                 },
                 required: ["name", "date", "time", "service", "professional", "totalPrice"]
@@ -506,6 +522,65 @@ Ao acionar a ferramenta 'agendar_horario', calcule o valor total e envie no camp
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deleteAppointment(input.id)),
     updateStatus: protectedProcedure.input(z.object({ id: z.number(), status: z.enum(['pendente', 'confirmado', 'concluido', 'cancelado']) })).mutation(async ({ input }) => await updateAppointmentStatus(input.id, input.status)),
     atualizarServicos: protectedProcedure.input(z.object({ id: z.number(), novosServicos: z.string(), novoPreco: z.string() })).mutation(async ({ input }) => await updateAppointmentServices(input.id, input.novosServicos, input.novoPreco)),
+  }),
+
+  // GESTÃO DE PROFISSIONAIS — dado administrativo (protectedProcedure), com
+  // exceção de `listPublic`: leitura simples (nome/especialidade, sem
+  // comissão) usada pela Home pública para montar o seletor de barbeiro do
+  // formulário de agendamento, que antes lia isso (errado) do localStorage.
+  professionals: router({
+    list: protectedProcedure.query(async () => await getProfessionals()),
+    listPublic: publicProcedure.query(async () => {
+      const lista = await getProfessionals();
+      return lista.map((p) => ({ id: p.id, nome: p.nome, especialidade: p.especialidade }));
+    }),
+    create: protectedProcedure
+      .input(z.object({ nome: z.string().min(1), comissao: z.number().optional(), especialidade: z.string().min(1) }))
+      .mutation(async ({ input }) => await createProfessional({
+        nome: input.nome,
+        comissao: String(input.comissao ?? 50),
+        especialidade: input.especialidade,
+      })),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), nome: z.string().optional(), comissao: z.number().optional(), especialidade: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, comissao, ...resto } = input;
+        return await updateProfessional(id, { ...resto, ...(comissao !== undefined ? { comissao: String(comissao) } : {}) });
+      }),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deactivateProfessional(input.id)),
+  }),
+
+  // GESTÃO DE SERVIÇOS/PREÇOS — mesmo padrão de professionals acima.
+  // `listPublic` alimenta a Home (tabela de preços + seleção no agendamento).
+  services: router({
+    list: protectedProcedure.query(async () => await getServices()),
+    listPublic: publicProcedure.query(async () => {
+      const lista = await getServices();
+      return lista.map((s) => ({ id: s.id, nome: s.nome, preco: s.preco }));
+    }),
+    create: protectedProcedure
+      .input(z.object({ nome: z.string().min(1), preco: z.number() }))
+      .mutation(async ({ input }) => await createService({ nome: input.nome, preco: String(input.preco) })),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), nome: z.string().optional(), preco: z.number().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, preco, ...resto } = input;
+        return await updateService(id, { ...resto, ...(preco !== undefined ? { preco: String(preco) } : {}) });
+      }),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deactivateService(input.id)),
+  }),
+
+  // GESTÃO DE DESPESAS FIXAS — só admin, nunca público.
+  expenses: router({
+    list: protectedProcedure.query(async () => await getExpenses()),
+    create: protectedProcedure
+      .input(z.object({ descricao: z.string().min(1), valor: z.number(), expiraEm: z.string().optional() }))
+      .mutation(async ({ input }) => await createExpense({
+        descricao: input.descricao,
+        valor: String(input.valor),
+        expiraEm: input.expiraEm || null,
+      })),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => await deleteExpense(input.id)),
   }),
 });
 

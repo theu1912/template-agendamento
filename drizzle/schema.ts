@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, numeric, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, timestamp, numeric, pgEnum, boolean } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const appointmentStatusEnum = pgEnum("appointment_status", [
@@ -56,3 +56,55 @@ export const appointments = pgTable("appointments", {
 
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertAppointment = typeof appointments.$inferInsert;
+
+/**
+ * Dados operacionais (profissionais, serviços/preços, despesas fixas).
+ * Antes viviam só no localStorage do navegador do dono (AdminDashboard.tsx) —
+ * migrados pra cá porque não sincronizavam entre dispositivos nem chegavam ao
+ * prompt do chatbot. client/src/config/site.ts (profissionais/servicos)
+ * agora serve só de semente inicial, usada uma única vez quando estas tabelas
+ * estão vazias (ver server/db.ts, seedDadosOperacionaisSeVazio) — depois
+ * disso o banco é a fonte da verdade, gerenciado pelo painel.
+ */
+export const professionals = pgTable("professionals", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  comissao: numeric("comissao", { precision: 5, scale: 2 }).notNull().default("50"),
+  especialidade: varchar("especialidade", { length: 255 }),
+  // "Remover" no painel apenas desativa (nunca apaga a linha) — agendamentos
+  // antigos guardam o nome do profissional como texto solto, não como FK,
+  // então isso é só pra sumir da lista ativa sem perder histórico.
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type Professional = typeof professionals.$inferSelect;
+export type InsertProfessional = typeof professionals.$inferInsert;
+
+export const services = pgTable("services", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  preco: numeric("preco", { precision: 10, scale: 2 }).notNull(),
+  // Mesmo raciocínio de professionals.ativo acima.
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type Service = typeof services.$inferSelect;
+export type InsertService = typeof services.$inferInsert;
+
+export const expenses = pgTable("expenses", {
+  id: serial("id").primaryKey(),
+  descricao: varchar("descricao", { length: 255 }).notNull(),
+  valor: numeric("valor", { precision: 10, scale: 2 }).notNull(),
+  // Data de expiração opcional, formato "YYYY-MM-DD" (mesmo padrão de
+  // appointments.appointmentDate) — null quando a despesa não expira.
+  expiraEm: varchar("expiraEm", { length: 10 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = typeof expenses.$inferInsert;

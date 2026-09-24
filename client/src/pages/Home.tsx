@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Button } from '@/components/ui/button';
@@ -278,14 +278,21 @@ export default function Home() {
     return () => ctx.revert();
   }, []);
 
-  // 1. Cérebro conectando a Equipe do Admin com o site público
-  const [professionals] = useState(() => {
-    const saved = localStorage.getItem("barbershop_barbeiros");
-    if (saved) {
-      return JSON.parse(saved).map((b: any) => ({
-        id: String(b.id),
-        name: b.nome,
-        specialty: b.especialidade || "Especialidade a definir"
+  // 1. Cérebro conectando a Equipe do Admin com o site público — antes lia
+  // do localStorage (só "funcionava" se o visitante abrisse o site no MESMO
+  // navegador em que o dono editou o painel, o que nunca acontece de
+  // verdade com um cliente real). Agora lê do Postgres via rota pública
+  // (server/routers.ts, professionals.listPublic) — mesma fonte que
+  // alimenta o prompt do chatbot, então site e IA nunca mais divergem.
+  // Fallback pro site.ts só cobre o instante de carregamento inicial da
+  // query (ou uma falha de rede) — o banco normalmente já vem semeado.
+  const { data: profissionaisDb } = trpc.professionals.listPublic.useQuery();
+  const professionals = useMemo(() => {
+    if (profissionaisDb && profissionaisDb.length > 0) {
+      return profissionaisDb.map((p: any) => ({
+        id: String(p.id),
+        name: p.nome,
+        specialty: p.especialidade || "Especialidade a definir"
       }));
     }
     return siteConfig.profissionais.map((p) => ({
@@ -293,36 +300,28 @@ export default function Home() {
       name: p.nome,
       specialty: "Especialidade a definir"
     }));
-  });
+  }, [profissionaisDb]);
 
-  // 2. Cérebro conectando os Preços do Admin com o site público
-  const [services, setServices] = useState<Service[]>(() => {
-    const saved = localStorage.getItem("barbershop_servicos");
-    if (saved) {
-      return JSON.parse(saved).map((s: any) => ({
-        id: String(s.id),
-        name: s.nome,
-        price: Number(s.preco),
-        selected: false
-      }));
+  // 2. Cérebro conectando os Preços do Admin com o site público — mesma
+  // migração de localStorage para o banco (tabela `services`, rota pública
+  // services.listPublic). O estado local continua existindo só pra guardar
+  // a seleção do cliente no formulário (`selected`), preservada entre
+  // refetches da query por id.
+  const { data: servicosDb } = trpc.services.listPublic.useQuery();
+  const [services, setServices] = useState<Service[]>([]);
+  useEffect(() => {
+    if (servicosDb && servicosDb.length > 0) {
+      setServices((anteriores) => {
+        const selecaoPorId = new Map(anteriores.map((s) => [s.id, s.selected]));
+        return servicosDb.map((s: any) => ({
+          id: String(s.id),
+          name: s.nome,
+          price: Number(s.preco),
+          selected: selecaoPorId.get(String(s.id)) ?? false,
+        }));
+      });
     }
-    return [
-      { id: '1', name: 'Cabelo', price: 60, selected: false },
-      { id: '2', name: 'Barba', price: 60, selected: false },
-      { id: '3', name: 'Cabelo & Barba', price: 110, selected: false },
-      { id: '4', name: 'Corte à Máquina', price: 35, selected: false },
-      { id: '5', name: 'Pézinho', price: 25, selected: false },
-      { id: '6', name: 'Sobrancelha Pinça', price: 40, selected: false },
-      { id: '7', name: 'Sobrancelha Navalha', price: 25, selected: false },
-      { id: '8', name: 'Hidratação', price: 25, selected: false },
-      { id: '9', name: 'Remoção de Pêlos do Nariz', price: 25, selected: false },
-      { id: '10', name: 'Remoção de Pêlos da Orelha', price: 25, selected: false },
-      { id: '11', name: 'Terapia Facial', price: 35, selected: false },
-      { id: '12', name: 'Selagem', price: 100, selected: false },
-      { id: '13', name: 'Camuflagem Grisalho', price: 65, selected: false },
-      { id: '14', name: 'Platinado', price: 220, selected: false },
-    ];
-  });
+  }, [servicosDb]);
   
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [formData, setFormData] = useState<FormData>({

@@ -4,12 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { XCircle, Phone, Mail, FileText, CheckCircle, Clock, Users, UserPlus, Settings, Lock, BarChart3, Save, Receipt, MessageCircle, AlertCircle, LogOut, ChevronDown, RefreshCw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { siteConfig } from "@/config/site";
 import { formatBRL } from "@/lib/utils";
-
-const TODOS_SERVICOS: { nome: string; preco: number }[] = [...siteConfig.servicos];
 
 // Fuso horário ajustado (mesmo padrão do Home.tsx) para não dar bug após as 21h.
 const dataHojeIso = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
@@ -35,18 +33,18 @@ const formatarServicoExibido = (services) => {
 const STATUS_LABEL = { pendente: "Pendente", confirmado: "Confirmado", concluido: "Concluído", cancelado: "Cancelado" };
 const STATUS_DOT = { pendente: "bg-yellow-500", confirmado: "bg-blue-500", concluido: "bg-green-500", cancelado: "bg-red-500" };
 
-export function EditarAgendamento({ agendamentoId, servicosAtuais, onSalvar }) {
+export function EditarAgendamento({ agendamentoId, servicosAtuais, todosServicos, onSalvar }) {
   const stringOriginal = servicosAtuais.join(", ");
   const [servicosSelecionados, setServicosSelecionados] = useState(() => {
-    return TODOS_SERVICOS.filter(s => stringOriginal.includes(s.nome)).map(s => s.nome);
+    return todosServicos.filter(s => stringOriginal.includes(s.nome)).map(s => s.nome);
   });
-  
+
   const atualizarMutacao = trpc.appointments.atualizarServicos.useMutation();
 
   const guardarAlteracoes = () => {
     const novoPreco = servicosSelecionados.reduce((total, nome) => {
-      const servico = TODOS_SERVICOS.find(s => s.nome === nome);
-      return total + (servico ? servico.preco : 0);
+      const servico = todosServicos.find(s => s.nome === nome);
+      return total + (servico ? Number(servico.preco) : 0);
     }, 0);
     const profissionalMatch = stringOriginal.match(/\(com .*?\)/);
     const profissional = profissionalMatch ? ` ${profissionalMatch[0]}` : "";
@@ -67,7 +65,7 @@ export function EditarAgendamento({ agendamentoId, servicosAtuais, onSalvar }) {
   return (
     <div className="flex flex-col gap-4 mt-2">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {TODOS_SERVICOS.map(servico => {
+        {todosServicos.map(servico => {
           const isSelected = servicosSelecionados.includes(servico.nome);
           return (
             <div key={servico.nome} onClick={() => {
@@ -79,7 +77,7 @@ export function EditarAgendamento({ agendamentoId, servicosAtuais, onSalvar }) {
               </div>
               <div>
                 <p className={`text-sm font-bold ${isSelected ? 'text-blue-900' : 'text-gray-600'}`}>{servico.nome}</p>
-                <p className="text-xs font-semibold text-[#D4AF37]">R$ {servico.preco}</p>
+                <p className="text-xs font-semibold text-[#D4AF37]">R$ {Number(servico.preco)}</p>
               </div>
             </div>
           );
@@ -104,6 +102,8 @@ export default function AdminDashboard() {
   const { data, isLoading, isFetching, refetch } = trpc.appointments.list.useQuery();
   const appointments = Array.isArray(data) ? data : [];
 
+  const utils = trpc.useUtils();
+
   const [abaAtiva, setAbaAtiva] = useState("agenda"); 
   const [filtroBarbeiro, setFiltroBarbeiro] = useState("Todos");
   const [filtroStatus, setFiltroStatus] = useState("pendentes");
@@ -123,12 +123,20 @@ export default function AdminDashboard() {
   };
 
   // --- GERENCIAMENTO DE BARBEIROS ---
-  const [listaBarbeiros, setListaBarbeiros] = useState(() => {
-    const saved = localStorage.getItem("barbershop_barbeiros");
-    if (saved) return JSON.parse(saved);
-    return [...siteConfig.profissionais];
+  // Antes vivia em localStorage (por navegador, nunca sincronizava entre
+  // dispositivos nem chegava ao prompt do chatbot) — agora é o Postgres
+  // (tabela `professionals`, ver drizzle/schema.ts e server/db.ts) que é a
+  // fonte da verdade. "Remover" desativa a linha (não apaga), então some da
+  // lista mas não perde o histórico dos agendamentos antigos desse barbeiro.
+  const { data: listaBarbeirosData } = trpc.professionals.list.useQuery();
+  const listaBarbeiros = listaBarbeirosData ?? [];
+
+  const criarBarbeiroMutation = trpc.professionals.create.useMutation({
+    onSuccess: () => utils.professionals.list.invalidate(),
   });
-  useEffect(() => localStorage.setItem("barbershop_barbeiros", JSON.stringify(listaBarbeiros)), [listaBarbeiros]);
+  const removerBarbeiroMutation = trpc.professionals.remove.useMutation({
+    onSuccess: () => utils.professionals.list.invalidate(),
+  });
 
   const [novoBarbeiroNome, setNovoBarbeiroNome] = useState("");
   const [novoBarbeiroComissao, setNovoBarbeiroComissao] = useState("");
@@ -137,60 +145,94 @@ export default function AdminDashboard() {
   const adicionarBarbeiro = () => {
     if (!novoBarbeiroNome) return alert("Digite o nome do barbeiro!");
     if (!novoBarbeiroEspecialidade) return alert("Digite a especialização do barbeiro!");
-    setListaBarbeiros([...listaBarbeiros, { id: Math.random(), nome: novoBarbeiroNome, comissao: Number(novoBarbeiroComissao || 50), especialidade: novoBarbeiroEspecialidade }]);
-    setNovoBarbeiroNome("");
-    setNovoBarbeiroComissao("");
-    setNovoBarbeiroEspecialidade("");
+    criarBarbeiroMutation.mutate(
+      { nome: novoBarbeiroNome, comissao: Number(novoBarbeiroComissao || 50), especialidade: novoBarbeiroEspecialidade },
+      {
+        onSuccess: () => {
+          setNovoBarbeiroNome("");
+          setNovoBarbeiroComissao("");
+          setNovoBarbeiroEspecialidade("");
+        },
+        onError: () => alert("Erro ao cadastrar profissional no servidor."),
+      }
+    );
   };
-  const removerBarbeiro = (id) => setListaBarbeiros(listaBarbeiros.filter(b => b.id !== id));
+  const removerBarbeiro = (id) => removerBarbeiroMutation.mutate({ id });
 
   // --- GERENCIAMENTO DE PREÇOS (SERVIÇOS) ---
-  const [listaServicos, setListaServicos] = useState(() => {
-    const saved = localStorage.getItem("barbershop_servicos");
-    if (saved) return JSON.parse(saved);
-    return TODOS_SERVICOS.map((s, i) => ({ id: i, ...s }));
+  // Mesma migração de localStorage → Postgres (tabela `services`) — preço
+  // editado aqui chega direto ao prompt do chatbot (server/routers.ts lê do
+  // banco a cada mensagem), sem precisar reiniciar nada.
+  const { data: listaServicosData } = trpc.services.list.useQuery();
+  const listaServicos = listaServicosData ?? [];
+
+  const atualizarServicoMutation = trpc.services.update.useMutation({
+    onSuccess: () => utils.services.list.invalidate(),
   });
-  useEffect(() => localStorage.setItem("barbershop_servicos", JSON.stringify(listaServicos)), [listaServicos]);
+  const criarServicoMutation = trpc.services.create.useMutation({
+    onSuccess: () => utils.services.list.invalidate(),
+  });
+  const removerServicoMutation = trpc.services.remove.useMutation({
+    onSuccess: () => utils.services.list.invalidate(),
+  });
 
   const atualizarPrecoServico = (id, novoPreco) => {
-    setListaServicos(listaServicos.map(s => s.id === id ? { ...s, preco: Number(novoPreco) } : s));
+    atualizarServicoMutation.mutate({ id, preco: Number(novoPreco) });
   };
 
-  // --- GESTÃO DE SAÍDAS DE CAIXA ---
-  const [listaGastos, setListaGastos] = useState(() => {
-    const savedGastos = localStorage.getItem("barbershop_gastos");
-    if (savedGastos) return JSON.parse(savedGastos);
-    return [
-      { id: 1, descricao: "Aluguel do Espaço", valor: 1500, expiraEm: "" },
-      { id: 2, descricao: "Luz e Água", valor: 350, expiraEm: "" },
-      { id: 3, descricao: "Produtos e Lâminas", valor: 200, expiraEm: "" }
-    ];
-  });
+  const [novoServicoNome, setNovoServicoNome] = useState("");
+  const [novoServicoPreco, setNovoServicoPreco] = useState("");
 
-  useEffect(() => {
-    localStorage.setItem("barbershop_gastos", JSON.stringify(listaGastos));
-  }, [listaGastos]);
+  const adicionarServico = () => {
+    if (!novoServicoNome || !novoServicoPreco) return alert("Preencha o nome e o preço do serviço!");
+    criarServicoMutation.mutate(
+      { nome: novoServicoNome, preco: Number(novoServicoPreco) },
+      {
+        onSuccess: () => {
+          setNovoServicoNome("");
+          setNovoServicoPreco("");
+        },
+        onError: () => alert("Erro ao cadastrar serviço no servidor."),
+      }
+    );
+  };
+  const removerServico = (id) => removerServicoMutation.mutate({ id });
+
+  // --- GESTÃO DE SAÍDAS DE CAIXA ---
+  // Mesma migração (tabela `expenses`) — sem coluna "ativo": remover aqui é
+  // exclusão real, igual ao array em localStorage já se comportava.
+  const { data: listaGastosData } = trpc.expenses.list.useQuery();
+  const listaGastos = listaGastosData ?? [];
+
+  const criarGastoMutation = trpc.expenses.create.useMutation({
+    onSuccess: () => utils.expenses.list.invalidate(),
+  });
+  const removerGastoMutation = trpc.expenses.remove.useMutation({
+    onSuccess: () => utils.expenses.list.invalidate(),
+  });
 
   const [novoGastoDesc, setNovoGastoDesc] = useState("");
   const [novoGastoValor, setNovoGastoValor] = useState("");
   const [novoGastoData, setNovoGastoData] = useState("");
-  
-  const totalGastos = listaGastos.reduce((acc, g) => acc + g.valor, 0);
+
+  const totalGastos = listaGastos.reduce((acc, g) => acc + Number(g.valor), 0);
 
   const adicionarGasto = () => {
     if (!novoGastoDesc || !novoGastoValor) return alert("Preencha a descrição e o valor!");
-    setListaGastos([...listaGastos, { 
-      id: Math.random(), 
-      descricao: novoGastoDesc, 
-      valor: Number(novoGastoValor),
-      expiraEm: novoGastoData 
-    }]);
-    setNovoGastoDesc("");
-    setNovoGastoValor("");
-    setNovoGastoData("");
+    criarGastoMutation.mutate(
+      { descricao: novoGastoDesc, valor: Number(novoGastoValor), expiraEm: novoGastoData || undefined },
+      {
+        onSuccess: () => {
+          setNovoGastoDesc("");
+          setNovoGastoValor("");
+          setNovoGastoData("");
+        },
+        onError: () => alert("Erro ao cadastrar despesa no servidor."),
+      }
+    );
   };
 
-  const removerGasto = (id) => setListaGastos(listaGastos.filter(g => g.id !== id));
+  const removerGasto = (id) => removerGastoMutation.mutate({ id });
 
   // --- FILTRAGEM INTELIGENTE ---
   const agendamentosFiltrados = appointments.filter(app => {
@@ -533,7 +575,7 @@ export default function AdminDashboard() {
                     {g.expiraEm && <span className="text-[10px] font-bold text-red-400 uppercase">Expira em: {formatarDataBR(g.expiraEm)}</span>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-black text-gray-800">{formatBRL(g.valor)}</span>
+                    <span className="font-black text-gray-800">{formatBRL(Number(g.valor))}</span>
                     <button onClick={() => removerGasto(g.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Remover Gasto">
                       <XCircle className="w-5 h-5" />
                     </button>
@@ -574,7 +616,7 @@ export default function AdminDashboard() {
                     <span className="text-[10px] text-gray-500">{barbeiro.especialidade || "Especialidade a definir"}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-green-600">{barbeiro.comissao}%</span>
+                    <span className="text-xs font-bold text-green-600">{Number(barbeiro.comissao)}%</span>
                     <button onClick={() => removerBarbeiro(barbeiro.id)} className="text-red-400 hover:text-red-600"><XCircle className="w-4 h-4" /></button>
                   </div>
                 </div>
@@ -603,16 +645,25 @@ export default function AdminDashboard() {
           <div className="space-y-6 mt-4">
             <div className="space-y-2">
               <p className="text-xs font-black text-gray-400 uppercase">Tabela de Preços (Visível no Site)</p>
-              <div className="space-y-2 border-2 border-gray-50 p-3 rounded-xl bg-gray-50/50">
+              <div className="space-y-2 border-2 border-gray-50 p-3 rounded-xl bg-gray-50/50 max-h-56 overflow-y-auto">
                 {listaServicos.map(servico => (
-                  <div key={servico.id} className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-gray-600">{servico.nome}</span>
+                  <div key={servico.id} className="flex justify-between items-center gap-2">
+                    <span className="text-xs font-bold text-gray-600 flex-1 truncate">{servico.nome}</span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-black text-gray-400">R$</span>
-                      <input type="number" value={servico.preco} onChange={(e) => atualizarPrecoServico(servico.id, e.target.value)} className="w-16 border-2 border-gray-200 p-1 text-center rounded text-xs font-bold text-[#D4AF37] outline-none focus:border-[#D4AF37]" />
+                      <input type="number" value={Number(servico.preco)} onChange={(e) => atualizarPrecoServico(servico.id, e.target.value)} className="w-16 border-2 border-gray-200 p-1 text-center rounded text-xs font-bold text-[#D4AF37] outline-none focus:border-[#D4AF37]" />
                     </div>
+                    <button onClick={() => removerServico(servico.id)} className="text-red-400 hover:text-red-600 shrink-0" title="Remover serviço">
+                      <XCircle className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
+                {listaServicos.length === 0 && <p className="text-center text-xs text-gray-400 font-bold py-2">Nenhum serviço cadastrado.</p>}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <input type="text" placeholder="Novo serviço" className="flex-1 border-2 border-gray-100 p-2 rounded-lg text-xs font-bold outline-none focus:border-[#D4AF37]" value={novoServicoNome} onChange={(e) => setNovoServicoNome(e.target.value)} />
+                <input type="number" placeholder="R$" className="w-20 border-2 border-gray-100 p-2 rounded-lg text-xs font-bold outline-none focus:border-[#D4AF37]" value={novoServicoPreco} onChange={(e) => setNovoServicoPreco(e.target.value)} />
+                <Button onClick={adicionarServico} className="bg-[#D4AF37] hover:bg-[#b8952e] text-white text-xs px-3 h-auto rounded-lg shrink-0">ADD</Button>
               </div>
             </div>
 
@@ -653,7 +704,7 @@ export default function AdminDashboard() {
 
               <div className="bg-blue-50/50 p-6 rounded-2xl border-2 border-blue-100">
                 <h4 className="font-black text-blue-800 flex items-center gap-2 mb-4 uppercase text-sm"><FileText className="w-4 h-4" /> Ajustar Serviços Prestados</h4>
-                <EditarAgendamento agendamentoId={selectedAppointment.id} servicosAtuais={selectedAppointment.services ? selectedAppointment.services.split(', ') : []} onSalvar={() => { refetch(); setShowDialog(false); }} />
+                <EditarAgendamento agendamentoId={selectedAppointment.id} servicosAtuais={selectedAppointment.services ? selectedAppointment.services.split(', ') : []} todosServicos={listaServicos} onSalvar={() => { refetch(); setShowDialog(false); }} />
               </div>
 
               <div className="bg-amber-50/50 p-6 rounded-2xl border-2 border-amber-100">
