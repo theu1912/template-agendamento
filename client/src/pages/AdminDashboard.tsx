@@ -316,7 +316,7 @@ export default function AdminDashboard() {
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
-        <div className="container overflow-x-auto">
+        <div className="container overflow-x-auto overflow-y-hidden">
           <nav className="flex gap-6 w-max min-w-full">
             <button onClick={() => setAbaAtiva("agenda")} className={`shrink-0 whitespace-nowrap -mb-px pb-2.5 border-b-2 text-sm transition-colors ${abaAtiva === "agenda" ? "text-gray-900 border-[#800020] font-medium" : "text-gray-500 border-transparent hover:text-gray-700"}`}>
               Agenda

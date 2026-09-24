@@ -16,19 +16,19 @@ export const siteConfig = {
   nomeBarbearia: "Sua Barbearia",
   nomeBarbeariaCurto: "Sua Barbearia", // usado em espaços menores (header, footer)
   anoFundacao: "2024",
-  slogan: "Cuidando da sua história desde {ANO}. Somos referência em barbearia premium, combinando tradição, excelência e profissionalismo.",
+  slogan: "[Seu slogan aqui — ex: Cuidando do seu estilo desde {ANO}]",
   // Texto da seção "A Nossa Essência". NÃO é texto fixo do template — é a
   // história própria de cada barbearia e deve ser preenchida/reescrita pelo
   // dono do negócio (fundação, missão, diferencial). O texto abaixo é apenas
   // um placeholder de exemplo.
-  sobre: "Nascida com a missão de resgatar a experiência autêntica das barbearias clássicas, não somos apenas um lugar para cortar o cabelo. Somos um refúgio para o homem moderno.",
+  sobre: "[Escreva aqui a história da sua barbearia: quando foi fundada, a missão e o que te diferencia.]",
   // Segundo parágrafo da mesma seção "A Nossa Essência" — também texto livre
   // do dono da barbearia (complemento do campo `sobre` acima), não fixo do template.
-  sobreComplemento: "Unimos técnicas consagradas pelo tempo com as tendências contemporâneas mais refinadas. O nosso espaço foi desenhado para proporcionar conforto, descontração e, acima de tudo, um atendimento impecável.",
+  sobreComplemento: "[Complemente aqui com mais detalhes sobre a experiência que os clientes encontram no seu espaço.]",
   // Texto curto do rodapé, abaixo do nome da barbearia. Texto livre do
   // cliente — não deve carregar posicionamento fixo do template (ex:
   // "Barbearia Premium"), já que nem toda barbearia quer esse tom.
-  footerDescricao: "Muito mais que cabelo e barba. Uma experiência desenhada para o homem que valoriza o próprio estilo.",
+  footerDescricao: "[Escreva aqui uma frase curta sobre a sua barbearia para o rodapé.]",
 
   // Visual
   logoUrl: "/assets/logo_placeholder.png",
@@ -109,9 +109,9 @@ export const siteConfig = {
   // antes de apresentar a demo). Usados na seção rotativa "O que dizem
   // nossos clientes".
   depoimentos: [
-    { nome: "Rafael Souza", texto: "Corte impecável e atendimento muito atencioso. Já virei cliente fixo!" },
-    { nome: "Marina Alves", texto: "Levei meu marido e ele saiu outro homem kkk, ambiente muito agradável e profissionais capricharam demais." },
-    { nome: "Gustavo Lima", texto: "Melhor barbearia que já fui, pontualidade e cuidado com detalhe em cada serviço." },
+    { nome: "[Nome do cliente]", texto: "[Cole aqui um depoimento real, por exemplo recortado do Google Meu Negócio.]" },
+    { nome: "[Nome do cliente]", texto: "[Outro depoimento real do seu negócio vai aqui.]" },
+    { nome: "[Nome do cliente]", texto: "[Mais um exemplo de avaliação de um cliente satisfeito.]" },
   ],
 
   // Serviço especial opcional (ex: pacote noivo, day spa, combo VIP).
