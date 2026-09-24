@@ -391,7 +391,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Despesas · 30 dias</p>
-                      <p className="mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap text-red-600">{formatBRL(-totalGastos)}</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums whitespace-nowrap text-gray-900">{formatBRL(totalGastos)}</p>
                     </div>
                     <div className="p-5">
                       <p className="text-sm text-gray-500">Lucro líquido · 30 dias</p>
